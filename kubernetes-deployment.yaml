@@ -1,0 +1,68 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: joinslack-svc
+  labels:
+    app: joinslack-svc
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: joinslack
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: joinslack-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts:
+        - "joinslack.kerberos.io"
+      secretName: joinslack
+  rules:
+    - host: "joinslack.kerberos.io"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: joinslack-svc
+                port:
+                  number: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: joinslack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: joinslack
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: joinslack
+    spec:
+      containers:
+        - name: joinslack
+          image: "kerberos/joinslack"
+          ports:
+            - containerPort: 80
+              name: http
